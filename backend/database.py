@@ -1,11 +1,14 @@
 import sqlite3
+import os
 
-# Function to initialize tables
+def get_db_path():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "eco_actions.db"))
+
+# Initialize database tables if not already present
 def initialize_db():
-    conn = sqlite3.connect("eco_actions.db", check_same_thread=False)
+    conn = sqlite3.connect(get_db_path(), check_same_thread=False)
     cursor = conn.cursor()
     
-    # Create the 'users' table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,7 +17,6 @@ def initialize_db():
         )
     """)
     
-    # Create the 'actions' table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS actions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +25,6 @@ def initialize_db():
         )
     """)
 
-    # Create the 'logs' table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,16 +34,16 @@ def initialize_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
-    # Commit the changes and close the cursor
+    
     conn.commit()
     cursor.close()
     conn.close()
 
-# Call this function to initialize the database at startup
-initialize_db()
-
-# Function to get a new database connection for each request
+# Always get a fresh connection with the correct path
 def get_db_connection():
-    conn = sqlite3.connect("eco_actions.db", check_same_thread=False)
-    return conn
+    path = get_db_path()
+    print("🔍 Using DB path:", path)  # TEMPORARY DEBUG PRINT
+    return sqlite3.connect(path, check_same_thread=False)
+
+# Call this once on app start
+initialize_db()

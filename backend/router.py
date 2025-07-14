@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.models import EcoAction, eco_actions
 from backend.database import get_db_connection
+from backend import database  # or just import database if same directory
 
 app = FastAPI()  # Define FastAPI app instance
 
@@ -35,26 +36,36 @@ def get_actions():
 @router.post("/signup")
 def signup(user: UserSignup):
     try:
-        conn = get_db_connection()
+        conn = get_db_connection()  # If you're using per-request connection
         cursor = conn.cursor()
         cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (user.username, user.password))
-        conn.commit()
-        conn.close()  # Close the connection after use
+        conn.commit()  # ✅ commit ensures data is saved
+        cursor.close()
+        conn.close()
         return {"message": "✅ Registered successfully"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail="❌ User already exists or error occurred")
+        print("❌ Signup error:", e)
+        raise HTTPException(status_code=400, detail="User may already exist.")
+
+
 
 @router.post("/login")
 def login(user: UserLogin):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (user.username, user.password))
-    result = cursor.fetchone()
-    conn.close()  # Close the connection after use
-    if result:
-        return {"message": "✅ Login successful"}
-    else:
-        raise HTTPException(status_code=401, detail="❌ Invalid username or password")
+    cursor.execute("SELECT password FROM users WHERE username=?", (user.username,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="❌ User not found")
+
+    stored_password = row[0]
+    if stored_password != user.password:
+        raise HTTPException(status_code=401, detail="❌ Incorrect password")
+
+    return {"message": "✅ Login successful"}
+
 
 @router.post("/log-action")
 def log_action(req: LogRequest):
@@ -68,7 +79,9 @@ def log_action(req: LogRequest):
     cursor.execute("INSERT INTO logs (username, action, points) VALUES (?, ?, ?)", (req.user, action.action, action.points))
     conn.commit()
     conn.close()  # Close the connection after use
+    
     return {"message": f"✅ Logged: {action.action} (+{action.points} pts)"}
+    
 
 @router.get("/history/{username}")
 def get_user_history(username: str):
@@ -78,6 +91,15 @@ def get_user_history(username: str):
     history = cursor.fetchall()
     conn.close()  # Close the connection after use
     return history
+
+@router.get("/debug-users")
+def debug_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, password FROM users")
+    users = cursor.fetchall()
+    conn.close()
+    return users
 
 # Register the router with the app
 app.include_router(router)

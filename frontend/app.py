@@ -6,12 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import flet as ft
 import requests
-from backend.router import router  # Correct import
-from fastapi import FastAPI
 
 API_BASE = "http://127.0.0.1:8000"
 
-users = {}  # username: {"password": ..., "fullname": ...}
 user_logs = {}  # username: list of actions
 
 
@@ -37,17 +34,24 @@ def main(page: ft.Page):
 
             if not uname or not pwd or not fname:
                 feedback_text.value = "⚠️ All fields are required."
-            elif uname in users:
-                feedback_text.value = "❗Username already exists."
-            else:
-                users[uname] = {"password": pwd, "fullname": fname}
-                user_logs[uname] = []
-                feedback_text.value = f"✅ Registered {fname}. Please log in."
-                username_field.value = ""
-                password_field.value = ""
-                fullname_field.value = ""
                 page.update()
-                show_login()
+                return
+
+            try:
+                resp = requests.post(
+                    f"{API_BASE}/signup",
+                    json={"username": uname, "password": pwd}
+                )
+                if resp.status_code == 200:
+                    feedback_text.value = f"✅ Registered {fname}. Please log in."
+                    username_field.value = ""
+                    password_field.value = ""
+                    fullname_field.value = ""
+                    show_login()
+                else:
+                    feedback_text.value = resp.json().get("detail", "❌ Signup failed.")
+            except Exception as ex:
+                feedback_text.value = f"⚠️ Error: {ex}"
             page.update()
 
         def switch_to_login(e):
@@ -69,14 +73,25 @@ def main(page: ft.Page):
         def login(e):
             uname = username_field.value.strip()
             pwd = password_field.value.strip()
-            if uname in users and users[uname]["password"] == pwd:
-                current_user["username"] = uname
-                current_user["fullname"] = users[uname]["fullname"]
-                username_field.value = ""
-                password_field.value = ""
-                show_action_screen()
-            else:
-                feedback_text.value = "❌ Invalid credentials."
+
+            if not uname or not pwd:
+                feedback_text.value = "⚠️ All fields are required."
+                page.update()
+                return
+
+            try:
+                resp = requests.post(
+                    f"{API_BASE}/login",
+                    json={"username": uname, "password": pwd}
+                )
+                if resp.status_code == 200:
+                    current_user["username"] = uname
+                    current_user["fullname"] = uname  # optional, replace with real fullname if stored
+                    show_action_screen()
+                else:
+                    feedback_text.value = resp.json().get("detail", "❌ Invalid credentials.")
+            except Exception as ex:
+                feedback_text.value = f"⚠️ Error: {ex}"
             page.update()
 
         def switch_to_signup(e):
@@ -128,14 +143,12 @@ def main(page: ft.Page):
                 if resp.status_code == 200:
                     message = resp.json().get("message", "Logged.")
                     feedback_text.value = message
-                    # Append to history (simulate)
                     selected = next(
                         (opt for opt in action_dropdown.options if opt.key == action_id),
                         None
                     )
                     if selected:
                         history_column.controls.append(ft.Text(selected.text))
-                    page.update()
                 else:
                     feedback_text.value = "❌ Failed to log action."
             except Exception as ex:
@@ -162,6 +175,5 @@ def main(page: ft.Page):
         load_actions()
 
     show_signup()
-
 
 ft.app(target=main)
