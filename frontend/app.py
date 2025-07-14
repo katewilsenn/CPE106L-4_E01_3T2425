@@ -1,5 +1,13 @@
+import sys
+import os
+
+# Add the parent directory to sys.path so Python can find 'backend'
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import flet as ft
 import requests
+from backend.router import router  # Correct import
+from fastapi import FastAPI
 
 API_BASE = "http://127.0.0.1:8000"
 
