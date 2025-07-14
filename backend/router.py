@@ -47,8 +47,6 @@ def signup(user: UserSignup):
         print("❌ Signup error:", e)
         raise HTTPException(status_code=400, detail="User may already exist.")
 
-
-
 @router.post("/login")
 def login(user: UserLogin):
     conn = get_db_connection()
@@ -66,22 +64,20 @@ def login(user: UserLogin):
 
     return {"message": "✅ Login successful"}
 
-
 @router.post("/log-action")
 def log_action(req: LogRequest):
     matching = [a for a in eco_actions if a.id == req.action_id]
     if not matching:
         raise HTTPException(status_code=400, detail="❌ Invalid action ID")
-    
+
     action = matching[0]
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO logs (username, action, points) VALUES (?, ?, ?)", (req.user, action.action, action.points))
     conn.commit()
     conn.close()  # Close the connection after use
-    
+
     return {"message": f"✅ Logged: {action.action} (+{action.points} pts)"}
-    
 
 @router.get("/history/{username}")
 def get_user_history(username: str):
@@ -91,6 +87,24 @@ def get_user_history(username: str):
     history = cursor.fetchall()
     conn.close()  # Close the connection after use
     return history
+
+@router.get("/user-points/{username}")
+def get_total_points(username: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(points) FROM logs WHERE username=?", (username,))
+    total = cursor.fetchone()[0] or 0
+    conn.close()
+    return {"points": total}
+
+@router.get("/leaderboard")
+def get_leaderboard():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, SUM(points) as total_points FROM logs GROUP BY username ORDER BY total_points DESC LIMIT 10")
+    result = cursor.fetchall()
+    conn.close()
+    return [{"username": row[0], "points": row[1]} for row in result]
 
 @router.get("/debug-users")
 def debug_users():
@@ -103,3 +117,4 @@ def debug_users():
 
 # Register the router with the app
 app.include_router(router)
+
