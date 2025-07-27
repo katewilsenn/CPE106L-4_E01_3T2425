@@ -20,8 +20,13 @@ def main():
     # Ensure the 'Rating' column is numeric
     moviesDF['Rating'] = pd.to_numeric(moviesDF['Rating'], errors='coerce')
 
-    # Group the data by 'Genre1' and calculate the average rating for each genre
-    average_ratings = moviesDF.groupby('Genre1')['Rating'].mean()
+    # Split genres and explode the DataFrame
+    moviesDF['Genre'] = moviesDF['Genre'].str.split(',')
+    exploded = moviesDF.explode('Genre')
+    exploded['Genre'] = exploded['Genre'].str.strip()  # Remove extra spaces
+
+    # Group by individual genre and calculate average rating
+    average_ratings = exploded.groupby('Genre')['Rating'].mean()
 
     # Print the average ratings for debugging
     print("Average Ratings per Genre:")
@@ -30,7 +35,6 @@ def main():
     # Plot the data
     plt.figure(figsize=(10, 6))  # Set the figure size
     average_ratings.plot(kind='bar', color='skyblue')  # Create a bar plot
-
 
     # Add title and labels
     plt.title("Average Rating per Movie Genre")
